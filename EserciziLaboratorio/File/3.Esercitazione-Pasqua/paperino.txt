@@ -1,0 +1,6 @@
+prova 
+di 
+un 
+file 
+con 6 
+linee
