@@ -22,6 +22,7 @@ int main (int argc, char **argv) {
 	char str_char[max];
 	char str_num[max];
 	int j;
+	int status;
 
 	/* controllo sul numero di parametri */
 	if (argc < 3){
@@ -115,6 +116,28 @@ int main (int argc, char **argv) {
 	for (int i = 0; i< size; i++){						/* il padre scrive su stdout 1 carattere e 1 numero alternandoli */
 		printf("%c\n", str_num[i]);
 		printf("%c\n", str_char[i]);
+	}
+
+		for (int i = 0; i < N; i++){
+		pid = wait(&status);
+
+		if (pid < 0){
+			printf("ERRORE nell wait\n");
+			exit (5);
+		}
+
+		if (status & 0xFF){
+			printf("Figlio con pid %d terminato in modo anomalo\n", pid);
+		}
+		else{
+			int ritorno = (int)((status >> 8) & 0xFF);
+			if (ritorno != 0){
+				printf("C'è stato qualche problema nel figlio");
+			}
+			else
+				printf("Il figlio con pid=%d ha ritornato %d\n", pid, ritorno);
+		}
+
 	}
 
 }
