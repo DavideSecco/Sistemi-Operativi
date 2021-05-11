@@ -22,7 +22,7 @@ int main(int argc, char **argv){
 
 	n = argc - 2;	// numero dei caratteri passati
 
-	// devo controllare che siano caratteri?
+	// devo controllare che siano caratteri
 	for (int i = 0; i < n; i++){
 		if(strlen(argv[i+2]) != 1){
 			printf("ERRORE: %s non è un carattere\n", argv[i+2]);
