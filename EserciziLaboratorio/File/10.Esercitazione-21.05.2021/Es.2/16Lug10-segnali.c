@@ -7,6 +7,8 @@
 #include <stdbool.h>
 #include <signal.h>
 
+#define _DEFAULT_SOURCE
+
 typedef struct {
 	int indice; 			// equivale a c1
 	int caratteriLetti;		// equivale a c2
@@ -42,7 +44,10 @@ int main (int argc, char **argv) {
 	int status = 0;
 	int ritorno = 0;
 
-	
+	/* -- SE INSERISCO I SEGNALI QUI, IL PROGRAMMA FUNZIONA */
+	/*signal(SIGUSR1, stampa);
+	signal(SIGUSR2, nulla);*/
+
 	if (argc < 3) {	/* controllo sul numero di paramentri */
 		puts("ERRORE hai inserito pochi parametri");
 		exit(1);
@@ -84,6 +89,9 @@ int main (int argc, char **argv) {
 
 		/* FIGLIO */
 		if(pid[i] == 0){
+			/* -- SE INSERISCO I SEGNALI QUI, IL PROGRAMMA FUNZIONA */
+			/*signal(SIGUSR1, stampa);
+			signal(SIGUSR2, nulla);*/
 			
 			for (int j = 0; j < N; j++){		// chiudo tutte le pipe che non mi servono
 				if(i == 0){
@@ -102,8 +110,9 @@ int main (int argc, char **argv) {
 			printf("Sono il figlio %d PID = %d\n", i, getpid());
 
 			for (k = 0; k < H; k++) {			// per ogni linea del file devo contare i numero di caratteri
-				signal(SIGUSR1, stampa);
-				signal(SIGUSR2, nulla);
+				/* -- SE INSERISCO I SEGNALI QUI, IL PROGRAMMA FUNZIONA */
+				/*signal(SIGUSR1, stampa);
+				signal(SIGUSR2, nulla);*/
 				
 				j = 0;
 				while((nread = read(fd, &riga[j], 1)) > 0){
@@ -188,7 +197,7 @@ int main (int argc, char **argv) {
 		else{
 			ritorno=(int)((status>>8) & 0xFF);
 			if(ritorno != 0)
-				printf("il figlio ha ritornato %d, quindi vuol dice che lui o il nipote hanno riscontrato errori", status);
+				printf("il figlio ha ritornato %d, quindi vuol dice che lui o il nipote hanno riscontrato errori", ritorno);
 			else
 				printf("il figlio  con PID: %d ha ritornato %d", pidfiglio, ritorno);
 		}
