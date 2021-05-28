@@ -7,8 +7,7 @@
 #include <stdbool.h>
 #include <signal.h>
 
-/* tentativo preso da internet */
-/* #define _DEFAULT_SOURCE */
+//#define _DEFAULT_SOURCE
 
 typedef struct {
 	int indice; 			// equivale a c1
@@ -46,8 +45,8 @@ int main (int argc, char **argv) {
 	int ritorno = 0;
 
 	/* -- SE INSERISCO I SEGNALI QUI, IL PROGRAMMA FUNZIONA */
-	/*signal(SIGUSR1, stampa);
-	signal(SIGUSR2, nulla);*/
+	signal(SIGUSR1, stampa);
+	signal(SIGUSR2, nulla);
 
 	if (argc < 3) {	/* controllo sul numero di paramentri */
 		puts("ERRORE hai inserito pochi parametri");
@@ -64,11 +63,13 @@ int main (int argc, char **argv) {
 
 	printf("Numero Linee dei file %d\n", H);
 
-	if(((strlen(argv[N+1])) != 1) || H < 1 || H > 254){			// controllo sul valore del numero di linee
+	//if(((strlen(argv[N+1])) != 1) || H < 1 || H > 254){			// controllo sul valore del numero di linee
+	if(H < 1 || H > 254){			// controllo sul valore del numero di linee
 		printf("ERRORE: il numero di linee non è valido\n");
 		exit(2);
 	}	
 
+	//ATTENZIONE VA SEMPRE CONTORLLATO IL RISULTATO DELLA MALLOC CHE NON SIA NULL!
 	pid = malloc(N*sizeof(int));			// per memorizzare i pid dei figli
 	
 	piped = malloc(N*sizeof(pipe_t));
@@ -107,13 +108,19 @@ int main (int argc, char **argv) {
 			}
 
 			fd = open(argv[i+1], O_RDONLY);		// aperto il file di ogni figlio
+			//bisogna controllare che vada a buon fine la open
+			if (fd < 0)
+			{
+				printf("ERRORE NELLA OPEN DA PARTE DEL FIGLIO %d PER IL FILE %s\n", i, argv[i+1]);
+				exit(-1);
+                        }
 
 			printf("Sono il figlio %d PID = %d\n", i, getpid());
 
 			for (k = 0; k < H; k++) {			// per ogni linea del file devo contare i numero di caratteri
-				/* SE INSERISCO I SEGNALI QUI, IL PROGRAMMA FUNZIONA */
-				signal(SIGUSR1, stampa);
-				signal(SIGUSR2, nulla);
+				/* -- SE INSERISCO I SEGNALI QUI, IL PROGRAMMA FUNZIONA */
+				/*signal(SIGUSR1, stampa);
+				signal(SIGUSR2, nulla);*/
 				
 				j = 0;
 				while((nread = read(fd, &riga[j], 1)) > 0){
@@ -123,11 +130,13 @@ int main (int argc, char **argv) {
 						j++;
 				}
 				
+				//riga[j]='\0';
+				//si sovrascriva erroneamente il terminatore di linea
+				j++;
 				riga[j]='\0';
 
-				strut.indice = i;
+				strut.indice = i; 
 				strut.caratteriLetti = strlen(riga) + 1;
-
 				
 				if(i != 0){				// a meno di essere il primo nodo, devo leggere i dati della struct che mi invia il nodo precendete
 					read(piped[i-1][0], &strutprima, sizeof(s_occ));
@@ -143,9 +152,11 @@ int main (int argc, char **argv) {
 				// una volta inviata dovrei ricevere dal padre l'indicazione se stampare o meno una delle mie righe
 				pause();
 
-				strutprima.indice=0;
-				strutprima.caratteriLetti = 0;
-				strut.indice=0;
+				//gli azzeramenti di strurprima sono assolutamente inutiti
+				//strutprima.indice=0;
+				//strutprima.caratteriLetti = 0;
+				//indice del processo non cambia e quindi anche questo azzeramento non è necessario e il settaglio sarebbe il caso di farlo all'esterno dei cicli
+				//strut.indice=0;
 				strut.caratteriLetti = 0;
 			}
 
@@ -167,7 +178,9 @@ int main (int argc, char **argv) {
 	for(i = 0; i < H; i++){
 
 		read(piped[N-1][0], &strut, sizeof(strut));		// leggo la struct che mi è arrivata per ogni linea
-		printf("PADRE: Riga %d ho ricevuto indice = %d Numero caratteri = %d\n", i, strut.indice, strut.caratteriLetti);
+		//printf("PADRE: Riga %d ho ricevuto indice = %d Numero caratteri = %d\n", i, strut.indice, strut.caratteriLetti);
+		//la numerazione delle linee e' conveniente dal numero 1!
+		printf("PADRE: Riga %d ho ricevuto indice = %d Numero caratteri = %d\n", i+1, strut.indice, strut.caratteriLetti);
 
 		for(j = 0; j < N; j++){
 			sleep(0.5); /* per sicurezza */
@@ -197,7 +210,8 @@ int main (int argc, char **argv) {
 		}
 		else{
 			ritorno=(int)((status>>8) & 0xFF);
-			if(ritorno != 0)
+			//if(ritorno != 0) MA PERCHE'???
+			if(ritorno ==255)
 				printf("il figlio ha ritornato %d, quindi vuol dice che lui o il nipote hanno riscontrato errori", ritorno);
 			else
 				printf("il figlio  con PID: %d ha ritornato %d", pidfiglio, ritorno);
