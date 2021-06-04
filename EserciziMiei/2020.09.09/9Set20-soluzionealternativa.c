@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
 
 	//CREAZIONE PIPE 
 
-    /* OBBLIGATORIO: creo Q pipe */
+    /* OBBLIGATORIO: creo Q+1 pipe */
     for(q=0; q <= Q; q++) {
         if (pipe(piped[q]) < 0)        {
             printf("Errore nella creazione della pipe\n");
@@ -122,7 +122,7 @@ int main(int argc, char *argv[]) {
 			close(piped[q][0]);			// e pipe[0] in lettura per evitare il sigpipe dell'ultimo figlio nell'ultima scrittura
 	}
 
-	sleep(1);
+
 	for(linea = 1; linea <= L; linea++) {
 		printf("\nLinea %d\n", linea);
 		write(piped[0][1], &ok, sizeof(char));		// lancio l'innesco
