@@ -20,6 +20,7 @@ int main(int argc, char *argv[])
     int pidFiglio, status, ritorno;    /* variabili per wait*/
 	int fdCam;
 	char linea[255];
+	int count=0;
 	//CONTROLLI TIPICI
 
     /* OBBLIGATORIO: numero dei caratteri passati sulla linea di comando */
@@ -78,19 +79,22 @@ int main(int argc, char *argv[])
             }
 
 			k=0;
+			count =0;
 			/* eseguo codice figlio e eventuale nipote */
 			while(read(fd, &linea[k], 1)){
 				if(linea[k] == '\n'){
 					linea[k]='\0';
-					if(isdigit(linea[0]) >= 0 && (strlen(linea) + 1) < 10)
+					if(isdigit(linea[0]) >= 0 && (strlen(linea) + 1) < 10) {
 						write(piped[q][1], linea, strlen(linea) + 1);
+						count++;
+					}
 					k = 0;
 				}
 				else 
 					k++;
 			}
 
-			exit(0);
+			exit(count);
 		}
 	}
 
