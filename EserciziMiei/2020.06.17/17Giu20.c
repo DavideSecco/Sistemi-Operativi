@@ -10,53 +10,69 @@
 
 typedef int pipe_t[2];
 
-typedef struct{
-    int pid1;				/* campo c1  */
-	char secondo;			/* campo c2  */
-	char penultimo			/* campo c3  */
-} s_occ;
-
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[]){
     int pid;      						/* pid per fork */
-   	int fd;      						/* per open */
-    int q, k, j;     						/* indici, i per i figli! */
+   	int B ;   							/* numero di caratteri e quindi numero di processi */
+    int fd;      						/* per open */
+    int q, k;     						/* indici, i per i figli! */
     char c;       						/* per leggere dal file */
     pipe_t *piped;    					/* array dinamico di pipe */
     int pidFiglio, status, ritorno;    /* variabili per wait*/
 	char F[255];
 	int L;
-	s_occ s;
-	char linea[255];
 	char Fchiara[255];
 	int fc;
+	char blocco[255];
+
 	//CONTROLLI TIPICI
 
     /* OBBLIGATORIO: numero dei caratteri passati sulla linea di comando */
-    if (argc != 3)   {
+    if (argc != 4)   {
         printf("Errore nel numero dei parametri\n");
         exit(1);
     }
     
-   //ALLOCAZIONE MEMORIA MALLOC
+    strcpy(F, argv[1]);
+	strcpy(Fchiara, F);
 
-    /* OBBLIGATORIO: allocazione L pipe */
-    if ((piped=(pipe_t *)malloc(L*sizeof(pipe_t))) == NULL)    {
+	B = atoi(argv[2]);
+	L = atoi(argv[3]);
+
+	if(L <= 0 || B <= 0 || L >= 255 || B >= 255){
+		printf("Almeno uno dei due numeri non è valido\n");
+		exit(2);
+	}
+
+	printf("B = %d\n", B);
+	printf("L = %d\n", L);
+
+	/* creo il file F.chiara */
+	strcat(Fchiara, ".Chiara");
+	if((fc = creat(Fchiara, O_WRONLY)) < 0){
+		printf("Errore nella creazione del file chiara\n");
+		exit(5);
+	}
+
+	//ALLOCAZIONE MEMORIA MALLOC
+
+    /* OBBLIGATORIO: allocazione B  pipe */
+    if ((piped=(pipe_t *)malloc(B *sizeof(pipe_t))) == NULL)    {
     	printf("Errore allocazione pipe\n");
     	exit(3); 
     }
 
 	//CREAZIONE PIPE 
 
-    /* OBBLIGATORIO: creo L pipe */
-    for (q=0; q < L; q++) {
+    /* OBBLIGATORIO: creo B  pipe */
+    for (q=0; q < B ; q++) {
         if (pipe(piped[q]) < 0)        {
             printf("Errore nella creazione della pipe\n");
             exit(1);
         }
 	}
 
-	printf("Sono il processo padre con pid%d e sto per generare %d figli\n", getpid(), L);
-    for (q=0; q < L; q++) {
+	printf("Sono il processo padre con pid%d e sto per generare %d figli\n", getpid(), B );
+    for (q=0; q < B ; q++) {
 		/* OBBLIGATORIO: creazione dei figli */
         if ((pid = fork()) < 0) {
             printf ("Errore nella fork\n");
@@ -67,7 +83,8 @@ int main(int argc, char *argv[]) {
             printf("Figlio %d con pid %d\n", q, getpid());
 
 			/* OBBLIGATORIO: chiude tutte le pipe che non usa (scegli schema chiusura!) */
-			for(k = 0; k < L; k++){
+
+			for (k = 0; k < B; k++){
 				close(piped[k][0]);
 				if(k != q)
 					close(piped[k][1]);
@@ -79,59 +96,39 @@ int main(int argc, char *argv[]) {
                 exit(-1);
             }
 
-			/* eseguo codice figlio */
-			/* scorro fino a trovare la linea del figlio */
-			j = 0;
-			while(j < q){
-				read(fd, &c, 1);
-				if(c == '\n')
-					j++;
+			/* scorro fino all blocco che mi interessa*/
+			lseek(fd, q*(L/B), SEEK_SET);
+
+			for(k = 0; k < B; k++){
+				read(fd, &blocco[k], 1);
+
 			}
 
-			j=0;				// contatore per i caratteri della linea
-			while(read(fd, &linea[j], 1)){
-				if(linea[j] == '\n'){
-					linea[j]='\0';
-					break;
-				}
-				else
-					j++;
-			}
-			s.pid1 = getpid();
-			s.secondo = linea[1];
-			s.penultimo = linea[strlen(linea)-1];
+			write(piped[q][1], &blocco[B-1], 1); // invio l'ultimo carattere
 
-			write(piped[q][1], &s, sizeof(s_occ));
-
-
-			exit(q+1);
+			exit(B);
 		}
 	}
 
 	/* padre */
-
-	sleep(1);
-	printf("Sono il padre con PID %d\n", getpid());
+	printf("Padre con PID: %d\n", getpid());
     
     /* OBBLIGATORIO: chiude tutte le pipe che non usa */
-	for(q=0; q<L; q++){
+	for(q = 0; q < B; q++){
 		close(piped[q][1]);
 	}
 	
-	/* legge dalle pipe i messaggi */
-	for(k = 0; k < L; k++){
-		read(piped[k][0], &s, sizeof(s_occ));
-		if(s.secondo == s.penultimo){
-			printf("\nLinea %d\n", k);
-			printf("PID figlio: %d\n", s.pid1);
-			printf("Carattere %c\n", s.secondo);
-		}
+	/* legge dalle pipe q messaggi o manda segnali?*/
+	for(q = 0; q < B; q++){
+		read(piped[q][0], &c, 1);		//leggo dalla pipe
+		write(fc, &c, 1);				// scrivo sul file
+		printf("Ho scritto sul file\n");
 	}
-
+	
 	//ATTESA TERMINAZIONE DEI FIGLI   
     /* Attesa della terminazione dei figli */
         
-    for(q=0;q < L;q++) {
+    for(q=0;q < B ;q++) {
     	pidFiglio = wait(&status);
         if (pidFiglio < 0){
             printf("Errore wait\n");
