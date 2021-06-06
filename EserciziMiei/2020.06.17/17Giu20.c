@@ -101,7 +101,6 @@ int main(int argc, char *argv[]){
 
 			for(k = 0; k < B; k++){
 				read(fd, &blocco[k], 1);
-
 			}
 
 			write(piped[q][1], &blocco[B-1], 1); // invio l'ultimo carattere
