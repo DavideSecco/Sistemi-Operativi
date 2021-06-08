@@ -8,56 +8,61 @@
 #include <signal.h>
 #include <ctype.h>
 
-// touch solo per testare2
-
-int token;
 typedef int pipe_t[2];
+int token;
+
+typedef struct{
+    int indice;				/* campo c1 del testo */
+	int occorenze; 			/* campo c2 del testo  */
+} s_occ;
 
 void scrivi(){
 	token = 1;
 }
 
-void salta(){
+void salta (){
 	token = 0;
 }
 
-int indicemax(char vet[], int N){
-	int max=0;
-	for (int i = 1; i < N; i++){
-		if(vet[max] < vet[i]){
-			max = i;
-		}
-	}
-	return max; 
-}
-
 int main(int argc, char *argv[]){
-    int *pid;							/* array di pid */
-	int nr;
-	char linea[250];
+    int *pid;      						/* pid per fork */
     int N;   							/* numero di caratteri e quindi numero di processi */
     int fd;      						/* per open */
-    int i, j;     						/* indici, i per i figli! */
-    char c;       						/* per leggere dal file */
+    int i, j, k;     						/* indici, i per i figli! */
+    int cont;     						/* per conteggio */
     pipe_t *piped;    					/* array dinamico di pipe */
-    int pidFiglio, status, ritorno;    /* variabili per wait*/
-	char vet[255];
-	bool b;
-	int max;
-	int nlinea;
-	int cont;
+    int pidFiglio, status, ritorno;     /* variabili per wait*/
+	char Cx;
+	int H;
+	s_occ s;
+	int nr;
+	char linea[255];
+
 	//CONTROLLI TIPICI
 
     /* OBBLIGATORIO: numero dei caratteri passati sulla linea di comando */
-    if (argc < 3)   {
+    if (argc < 4 )   {
         printf("Errore nel numero dei parametri\n");
         exit(1);
     }
     
-    N = argc - 1;
+    N = argc - 3;
+	Cx = argv[argc-2][0];
+	H = atoi(argv[argc-1]);
 
-	printf("Sono stati inseriti %d file\n", N);
+	if(strlen(argv[argc-1]) != 1){
+		printf("Non hai inserto un singolo carattere\n");
+		exit(2);
+	}
 
+	if(H <= 0){
+		printf("Numero H non valido\n");
+		exit(3);
+	}
+
+	printf("Hai inserito %d file\n", N);
+	printf("Hai inserito il carattere %c\n", Cx);
+	printf("Hai inserito il numero %d\n", H);
 	//ALLOCAZIONE MEMORIA MALLOC
 
     /* OBBLIGATORIO: allocazione N pipe */
@@ -66,13 +71,13 @@ int main(int argc, char *argv[]){
     	exit(3); 
     }
 
-	/* allocazione array per i pid */
-    if ((pid = (int *)malloc(N * sizeof(int))) == NULL) {
-        printf("Errore allocazione pid\n");
-        exit(4);
+	/* NON È DETTO SERVA: allocazione array per i pid */
+    if ((pid=(int *)malloc(N*sizeof(int))) == NULL)    {
+    	printf("Errore allocazione pid\n");
+    	exit(4);
     }
 
-	/* NON È DETTO SERVA:  padre aggancia le due funzioni (scrivi e salta) che useranno i figli alla ricezione dei segnali inviati dal padre */
+	/*  padre aggancia le due funzioni (scrivi e salta) che useranno i figli alla ricezione dei segnali inviati dal padre */
     bsd_signal(SIGUSR1,scrivi);
     bsd_signal(SIGUSR2,salta);
 
@@ -97,11 +102,12 @@ int main(int argc, char *argv[]){
 		if (pid[i] == 0) /* figlio */ {
             printf("Figlio %d con pid %d\n", i, getpid());
 
-			/* OBBLIGATORIO: chiude tutte le pipe che non usa (scegli schema chiusura!) */
-			for (j = 0; j < N; j++){
-				close(piped[j][0]);
-				if(i!=j)
-					close(piped[j][1]);
+			//schema pipeline: ogni figlio legge dalla pipe i-1 e scrive sulla i
+			for (k = 0; k < N; k++)			{
+				if (k != i)
+					close(piped[k][1]);
+				if (i == 0 || k != i - 1)
+					close(piped[k][0]);
 			}
 
 			/* OBBLIGATORIO: apre il file */
@@ -110,81 +116,77 @@ int main(int argc, char *argv[]){
                 exit(-1);
             }
 
-			/* eseguo codice figlio e eventuale nipote */
-			// leggo il file
-			j=0;
-			nlinea=0;
-			cont=0;
-			while(1){
-				nr = read(fd, &linea[j], 1);
+			/* eseguo codice figlio */
+			
+			for(k = 0; k < H; k++){
 
-				if(linea[j] == '\n' || nr == 0){
-					nlinea++;
-					linea[j]='\0';
-					write(piped[i][1], &linea[0], 1);
-					pause();
+				if(i != 0)
+					read(piped[i-1][0], &s, sizeof(s_occ));
+				else{
+					s.occorenze = 0;
+					s.indice = 0;
+				}
 
-					if(token){
-						printf("Il processo %d (PID %d) carattere: %c linea: %d\n", i, getpid(), linea[0], nlinea);	
-						cont++;
-					}
-
-					if(nr == 0){
-						exit(cont);
+				j = 0;
+				cont = 0;
+				while((nr = read(fd, &linea[j], 1)) > 0 ){
+					if(linea[j] == '\n'){
+						linea[j] = '\0';
 						break;
 					}
-					j=0;
+					if(linea[j] == Cx)
+						cont++;
+					else 
+						j++;
 				}
-				else
-					j++;
-				
 
-				
+				// aggiorno i dati della struttura nel caso ce ne sia bisogno 
+				if(s.occorenze < cont){
+					s.indice = i;
+					s.occorenze = cont;
+				}
+
+				// invio la struttura
+				write(piped[i][1], &s, sizeof(s_occ));	
+
+				// attesa del segnale
+				pause();
+
+				if(token){
+					printf("Linea %d: %s\n", k, linea);
+					printf("Figlio %d PID: %d occorenze: %d	\n\n", i, getpid(), s.occorenze);
+				}
 			}
 			
-			exit(cont);
+
+
+			exit(0);
 		}
 	}
 
 	/* padre */
 	printf("Padre con PID: %d\n", getpid());
     
-    /* OBBLIGATORIO: chiude tutte le pipe che non usa */
-	for(i = 0; i < N; i++){
-		close(piped[i][1]);
-	}
+	/* chiude tutte le pipe che non usa */
+	for (k = 0; k < N; k++)	{
+		close(piped[k][1]);
 
+		if (k != N - 1)		{
+			close(piped[k][0]);
+		}
+	}
+	
 	/* legge dalle pipe i messaggi o manda segnali?*/
-	j=0;
-	b=false;
-	nlinea=0;
-	while(1){
-		nlinea++;
-		
-		for(i = 0; i < N; i++){
-			nr = read(piped[i][0], &c, 1);
-			if(nr > 0){
-				b = true;
-				vet[j] = c;
-			}
+	sleep(1);
+	for(i = 0 ; i< H; i++){
+		read(piped[N-1][0], &s, sizeof(s_occ));
+
+		for(k=0; k<N; k++){
+			if(k == s.indice)
+				kill(pid[s.indice], SIGUSR1);
 			else
-				vet[j]=0;
-			j++;
+				kill(pid[k], SIGUSR2);
 		}
-		if(b == false){
-			break;
-		}
-		max=indicemax(vet, N);
-		printf("Linea %d\n", nlinea);
-		for(i = 0; i <N; i++){
-			if(max != i)
-				kill(pid[i], SIGUSR2);		// INVIO ai figli che non devono STAMPARE LA LINEA
-			else
-				kill(pid[i], SIGUSR1);		// INVIO IL SEGNALE ALL'UNICO FIGLIO CHE DEVE STAMPARE LA LINEA
-		}
-		sleep(1);
-		j = 0;
-		b = false;
 	}
 	//ATTESA TERMINAZIONE DEI FIGLI   
     /* Attesa della terminazione dei figli */
