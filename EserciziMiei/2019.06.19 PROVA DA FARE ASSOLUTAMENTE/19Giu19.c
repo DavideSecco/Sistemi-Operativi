@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <signal.h>
+#include <bsd_signal.h>  
 #include <ctype.h>
 
 // touch solo per testare2
