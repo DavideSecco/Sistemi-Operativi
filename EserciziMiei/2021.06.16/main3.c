@@ -10,20 +10,19 @@
 
 typedef int pipe_t[2];
 
-typedef char linea[250];
+typedef char linea[255];
 
 int main(int argc, char *argv[]){
     int pid;      						/* pid per fork */
-    int N;   							/* numero di caratteri e quindi numero di processi */
-    int fd, fcreato;   						/* per open */
-    int n, j, k;     						/* indici, n per n figli! */
+   	int N;   							/* numero di caratteri e quindi numero di processi */
+    int fd, fcreato;      						/* per open */
+    int i, j, k;     						/* indici, i per i figli! */
     pipe_t *piped;    					/* array dinamico di pipe */
     int pidFiglio, status, ritorno;    /* variabili per wait*/
 	linea *tutteLinee;
-	int nlinea;
-	char ok;
 	char lin[255];
 	int nr;
+	char c;
 
 	//CONTROLLI TIPICI
 
@@ -37,19 +36,20 @@ int main(int argc, char *argv[]){
 
 	printf("Sono stati inseriti %d file\n", N);
 
-	/* OBBLIGATORIO: creo il file */
+	// creo il file:
+
 	if ((fcreato = creat("Secco", O_WRONLY)) < 0) { 
 		printf("Errore nella creazione del file \n");
 		exit(-1);
 	}
 
-	// alloco spazio per tutte le tutteLinee:
-	if ((tutteLinee=(linea *)malloc(N*sizeof(linea))) == NULL)    {
-    	printf("Errore allocazione array per le tutteLinee\n");
-    	exit(3); 
+	//ALLOCAZIONE MEMORIA MALLOC
+	if ((tutteLinee=malloc(N*sizeof(linea))) == NULL)    {
+    	printf("Errore allocazione tutteLinee\n");
+    	exit(4); 
     }
 
-	//ALLOCAZIONE MEMORIA MALLOC
+	
 
     /* OBBLIGATORIO: allocazione N pipe */
     if ((piped=(pipe_t *)malloc(N*sizeof(pipe_t))) == NULL)    {
@@ -60,15 +60,15 @@ int main(int argc, char *argv[]){
 	//CREAZIONE PIPE 
 
     /* OBBLIGATORIO: creo N pipe */
-    for (n=0; n < N; n++) {
-        if (pipe(piped[n]) < 0)        {
+    for (i=0; i < N; i++) {
+        if (pipe(piped[i]) < 0)        {
             printf("Errore nella creazione della pipe\n");
             exit(1);
         }
 	}
 
 	printf("Sono il processo padre con pid%d e sto per generare %d figli\n", getpid(), N);
-    for (n=0; n < N; n++) {
+    for (i=0; i < N; i++) {
 		/* OBBLIGATORIO: creazione dei figli */
         if ((pid = fork()) < 0) {
             printf ("Errore nella fork\n");
@@ -76,58 +76,75 @@ int main(int argc, char *argv[]){
         }
 
 		if (pid == 0) /* figlio */ {
-            printf("Figlio %d con pid %d\n", n, getpid());
+            printf("Figlio %d con pid %d\n", i, getpid());
 
-			/* chiusura per schema a ring: */
+			/* OBBLIGATORIO: chiude tutte le pipe che non usa (scegli schema chiusura!) */
 			for (j=0; j < N; j++){
-				if(j != n)
+				if(j != i)
 					close(piped[j][0]);			// in lettura lascio aperta la pipe con lo stesso indice del figlio
-				if(j != ((n+1) % N))
+				if(j != ((i+1) % N))
 					close(piped[j][1]);			// in scrittura lascio aperta la pipe ...
 			}
 
 			/* OBBLIGATORIO: apre il file */
-            if ((fd = open(argv[n+1], O_RDONLY)) < 0) { 
-                printf("Errore nella apertura del file %s\n", argv[n+1]);
+            if ((fd = open(argv[i+1], O_RDONLY)) < 0) { 
+                printf("Errore nella apertura del file %s\n", argv[i+1]);
                 exit(-1);
             }
 
 			/* eseguo codice figlio e eventuale nipote */
-			nlinea = 0;
-			
 
-			for(nlinea = 0; ; nlinea = nlinea + 1 ){
-				if(n == 0 && nlinea == 0)
-					read(piped[n][0], &ok, 1);								// primo innesco del padre
-				else
-					read(piped[n][0], tutteLinee, sizeof(tutteLinee)*sizeof(linea));				// dal figlio precendente
-
-				// leggo la linea:
+			while(1){
+				read(piped[i][0], tutteLinee, sizeof(tutteLinee)*sizeof(linea));
 				j = 0;
-				while(nr = (read(fd, &lin[j], 1))){
+				while((nr = (read(fd, &lin[j], 1)))){
 					if(lin[j] == '\n'){
 						lin[j+1] = '\0';
-						
-						strcpy(tutteLinee[n], lin);
-						printf("Figlio %d riga %d: '%s'\n", n, nlinea, tutteLinee[n]);
-						write(piped[(n+1)%N][1], tutteLinee, sizeof(tutteLinee)*sizeof(linea)); 					// scrivo sulla pipe "successiva" al figlio
+
+						strcpy(tutteLinee[i], lin);
+
+						printf("Figlio %d linea: %s\n", i, tutteLinee[i]);
+
+						write(piped[(i+1)%N][1], tutteLinee, sizeof(tutteLinee)*sizeof(linea));
 						break;
 					}
-					else 
+					else
 						j++;
+
+					
+
+					
 				}
 
-				if(nr == 0)
-					break;
-
-				if(n == N - 1){
-					printf("\nScrivo su file questa riga di tutti i file che contengono: \n");
-					for(j = 0; j < N; j++){
-						printf("%s\n", tutteLinee[j]);
+				if(nr == 0){
+						break;
 					}
-					write(fcreato, tutteLinee, sizeof(tutteLinee)*sizeof(linea));
+
+				if(i == (N-1)){
+					printf("Scrivo su file:\n");
+
+					for(j = 0; j < N; j++){
+						k = 0;
+						while(1){
+							c = tutteLinee[j][k];
+							write(fcreato, &c, 1);
+							
+							if(c == '\n'){
+								k = 0;
+								break;
+							}
+							else{
+								k++;
+							}
+						}
+
+
+					}
+							
 				}
 			}
+
+
 			exit(0);
 		}
 	}
@@ -135,22 +152,24 @@ int main(int argc, char *argv[]){
 	/* padre */
 	printf("Padre con PID: %d\n", getpid());
     
-    /* chiude tutte le pipe che non usa */
-	for(n = 1; n < N; n++){
-		close(piped[n][0]);			// tengo aperto la pipe[0] in scrittura per l'innesco 
-		close(piped[n][1]);			// e pipe[0] in lettura per evitare il sigpipe dell'ultimo figlio nell'ultima scrittura
+    /* OBBLIGATORIO: chiude tutte le pipe che non usa */
+	for(i = 1; i < N; i++){
+		close(piped[i][0]);			// tengo aperto la pipe[0] in scrittura per l'innesco 
+		close(piped[i][1]);			// e pipe[0] in lettura per evitare il sigpipe dell'ultimo figlio nell'ultima scrittura
 	}
+	
+	/* legge dalle pipe i messaggi o manda segnali?*/
 
-	write(piped[0][1], &ok, sizeof(char));		// lancio l'innesco
+	write(piped[0][1], tutteLinee, sizeof(tutteLinee));		// lancio l'innesco
 	// sleep(1);
 	close(piped[0][1]);							// posso chiudere la pipe iniziale di scrittura
-	
-	/* legge dalle pipe n messaggi o manda segnali?*/
+
+	// NON chiudo la pipe in lettura!
 
 	//ATTESA TERMINAZIONE DEI FIGLI   
     /* Attesa della terminazione dei figli */
         
-    for(n=0;n < N;n++) {
+    for(i=0;i < N;i++) {
     	pidFiglio = wait(&status);
         if (pidFiglio < 0){
             printf("Errore wait\n");
